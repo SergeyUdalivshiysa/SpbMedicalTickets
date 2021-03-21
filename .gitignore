@@ -173,6 +173,6 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-.lib/chromedriver.exe
+*.chromedriver.exe
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,maven,java,intellij
