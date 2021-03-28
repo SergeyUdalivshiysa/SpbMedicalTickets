@@ -1,5 +1,8 @@
 package Main.services;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.openqa.selenium.By;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
@@ -13,12 +16,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
-
-import java.sql.Date;
 import java.time.Instant;
 import java.util.List;
 
-
+@Getter
+@Setter
+@NoArgsConstructor
 @Component
 @Scope("prototype")
 public class LookUpTask implements Runnable {
@@ -35,86 +38,6 @@ public class LookUpTask implements Runnable {
     private int attemptsNumber;
     int ticketNumber;
     Logger logger = LoggerFactory.getLogger(LookUpTask.class);
-
-
-    public LookUpTask() {
-    }
-
-    public LookUpTask(String url, String doctorOrCabinetName, int id) {
-        this.url = url;
-        this.id = id;
-        this.addTime = System.currentTimeMillis();
-        this.doctorOrCabinetName = doctorOrCabinetName.trim();
-        this.attemptsNumber = 0;
-        this.doctorChecked = false;
-    }
-
-    public LookUpTask(String url, String doctorOrCabinetName, int id, long addTime, int attemptsNumber, Instant lastAttempt, boolean doctorChecked) {
-        this.url = url;
-        this.id = id;
-        this.addTime = addTime;
-        this.doctorOrCabinetName = doctorOrCabinetName.trim();
-        this.attemptsNumber = attemptsNumber;
-        this.lastAttempt = lastAttempt;
-        this.doctorChecked = doctorChecked;
-    }
-
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public void setDoctorOrCabinetName(String doctorOrCabinetName) {
-        this.doctorOrCabinetName = doctorOrCabinetName;
-    }
-
-    public void setAddTime(long addTime) {
-        this.addTime = addTime;
-    }
-
-    public void setLastAttempt(Instant lastAttempt) {
-        this.lastAttempt = lastAttempt;
-    }
-
-    public void setDoctorChecked(boolean doctorChecked) {
-        this.doctorChecked = doctorChecked;
-    }
-
-    public void setAttemptsNumber(int attemptsNumber) {
-        this.attemptsNumber = attemptsNumber;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public String getDoctorOrCabinetName() {
-        return doctorOrCabinetName;
-    }
-
-    public long getAddTime() {
-        return addTime;
-    }
-
-    public Instant getLastAttempt() {
-        return lastAttempt;
-    }
-
-    public boolean isDoctorChecked() {
-        return doctorChecked;
-    }
-
-    public int getAttemptsNumber() {
-        return attemptsNumber;
-    }
 
     public void run() {
         logger.info("Начало работы id - " + id);
