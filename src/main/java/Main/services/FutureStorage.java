@@ -1,13 +1,10 @@
 package Main.services;
-
-import Main.Main;
-
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
 public class FutureStorage {
 
-    public static HashMap<Integer, ScheduledFuture> futureStorage = new HashMap<>();
+    public static ConcurrentHashMap<Integer, ScheduledFuture> futureStorage = new ConcurrentHashMap<>();
 
     public static synchronized void putToStorage(int id, ScheduledFuture scheduledFuture) {
         futureStorage.put(id, scheduledFuture);

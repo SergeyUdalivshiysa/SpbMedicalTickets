@@ -1,4 +1,5 @@
 package Main.services;
+
 import org.openqa.selenium.By;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
@@ -7,12 +8,15 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
-import java.sql.Date;
-import java.util.List;
 
+import java.sql.Date;
+import java.time.Instant;
+import java.util.List;
 
 
 @Component
@@ -22,16 +26,15 @@ public class LookUpTask implements Runnable {
     @Autowired
     private LookUpService lookUpService;
 
-
     private String url;
     private int id;
-    private long addTime;
     private String doctorOrCabinetName;
-    private Date lastAttempt;
+    private long addTime;
+    private Instant lastAttempt;
     private boolean doctorChecked;
     private int attemptsNumber;
-    public boolean isFinished = false;
-
+    int ticketNumber;
+    Logger logger = LoggerFactory.getLogger(LookUpTask.class);
 
 
     public LookUpTask() {
@@ -44,15 +47,16 @@ public class LookUpTask implements Runnable {
         this.doctorOrCabinetName = doctorOrCabinetName.trim();
         this.attemptsNumber = 0;
         this.doctorChecked = false;
-        this.lastAttempt = null;
     }
 
-    public LookUpTask(String url, String doctorOrCabinetName, int id, long addTime, int failedAttempts) {
+    public LookUpTask(String url, String doctorOrCabinetName, int id, long addTime, int attemptsNumber, Instant lastAttempt, boolean doctorChecked) {
         this.url = url;
         this.id = id;
         this.addTime = addTime;
         this.doctorOrCabinetName = doctorOrCabinetName.trim();
-        this.attemptsNumber = failedAttempts;
+        this.attemptsNumber = attemptsNumber;
+        this.lastAttempt = lastAttempt;
+        this.doctorChecked = doctorChecked;
     }
 
 
@@ -68,36 +72,71 @@ public class LookUpTask implements Runnable {
         this.doctorOrCabinetName = doctorOrCabinetName;
     }
 
+    public void setAddTime(long addTime) {
+        this.addTime = addTime;
+    }
+
+    public void setLastAttempt(Instant lastAttempt) {
+        this.lastAttempt = lastAttempt;
+    }
+
+    public void setDoctorChecked(boolean doctorChecked) {
+        this.doctorChecked = doctorChecked;
+    }
+
+    public void setAttemptsNumber(int attemptsNumber) {
+        this.attemptsNumber = attemptsNumber;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public String getDoctorOrCabinetName() {
+        return doctorOrCabinetName;
+    }
+
+    public long getAddTime() {
+        return addTime;
+    }
+
+    public Instant getLastAttempt() {
+        return lastAttempt;
+    }
+
+    public boolean isDoctorChecked() {
+        return doctorChecked;
+    }
+
+    public int getAttemptsNumber() {
+        return attemptsNumber;
+    }
 
     public void run() {
-        System.out.println("Начало работы id - " + id);
-        int ticketNumber;
+        logger.info("Начало работы id - " + id);
         sleep();
         WebDriver driver = getDriver();
-        WebElement webElement = getWebElement(driver, url, doctorOrCabinetName);
-        if (webElement == null) {
-            //TODO реализовать отмену задачи
-            System.out.println("доктора нема");
-        }
-        ticketNumber = getNumberOfTickets(webElement, driver);
-        getFinishedTaskInformation(ticketNumber);
+        getAndHandleWebElement(driver, url, doctorOrCabinetName);
     }
 
 
-
+    //Ожидание перед новым подключением к серверу горздрав, для предотвращения блокировки.
     private void sleep() {
         try {
-            Thread.sleep(500);
+            SleepService.sleep();
         } catch (InterruptedException e) {
             e.printStackTrace();
             if (FutureStorage.get(id).isCancelled()) {
                 Thread.currentThread().interrupt();
             }
-
         }
-
     }
 
+    //Используется веб драйвер, тк сайт горздрава динамический и более простым парсером не удается собрать данные
     private WebDriver getDriver() {
         ChromeOptions options = new ChromeOptions();
     /*      options.addArguments(
@@ -112,24 +151,50 @@ public class LookUpTask implements Runnable {
         return driver;
     }
 
-    private WebElement getWebElement(WebDriver driver, String url, String doctorOrCabinetName) {
-        driver.get(url);
-        WebDriverWait wait = new WebDriverWait(driver, 180);
+    private void getAndHandleWebElement(WebDriver driver, String url, String doctorOrCabinetName) {
         try {
-            WebElement visibleElement = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("ul[class='service-doctor-top__col service-doctor-top__list']")));
-        } catch (TimeoutException exception) {
-            exception.printStackTrace();
-            driver.quit();
-
-            if (!doctorChecked && attemptsNumber > 3) {
-                //TODO реализовать данный сценарий
-            }
+            WebElement webElement = getWebElement(driver, url, doctorOrCabinetName);
+            if (webElement != null) {
+                doctorChecked = true;
+                ticketNumber = getNumberOfTickets(webElement, driver);
+                getFinishedTaskInformation(ticketNumber);
+            } else handleDoctorAbsence();
         }
-        //Вариант 2
-        List<WebElement> elements = driver.findElements(By.cssSelector("div[data-doctor-name='" + doctorOrCabinetName + "']"));
-        return elements.isEmpty() ? null : elements.get(0);
+        catch (TimeoutException exception) {
+            logger.info("Id + " + id + ". Timeout Exception.");
+            handleTimeoutException(driver);
+        }
     }
 
+    private WebElement getWebElement(WebDriver driver, String url, String doctorOrCabinetName) throws TimeoutException {
+        driver.get(url);
+        WebDriverWait wait = new WebDriverWait(driver, 30);
+        WebElement visibleElement = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("ul[class='service-doctor-top__col service-doctor-top__list']")));
+        List<WebElement> elements = driver.findElements(By.cssSelector("div[data-doctor-name='" + doctorOrCabinetName + "']"));
+        return elements.isEmpty() ? null : elements.get(0);
+
+
+    }
+
+    private void handleTimeoutException(WebDriver driver) {
+        driver.quit();
+        if (!doctorChecked && attemptsNumber >= 3) {
+            logger.info("Id - " + id + ". Троекратная ошибка подключения к серверу.");
+            //Уведомить пользователя
+            lookUpService.eliminateTask(id);
+        }
+        else {
+            attemptsNumber++;
+            lastAttempt = Instant.ofEpochMilli(System.currentTimeMillis());
+            lookUpService.updateTaskEntity(this);
+        }
+    }
+
+    private void handleDoctorAbsence() {
+        logger.info("Id " + id + ". Доктор не найден.");
+        //Уведомить пользователя
+        lookUpService.eliminateTask(id);
+    }
 
     private int getNumberOfTickets(WebElement webElement, WebDriver driver) {
         String ticketsInformation = webElement.findElement(
@@ -137,48 +202,34 @@ public class LookUpTask implements Runnable {
         driver.close();
         driver.quit();
         if (ticketsInformation.trim().equals("")) {
-            return  0;
+            return 0;
         } else {
             ticketsInformation = ticketsInformation.replaceAll("[\\D]", "");
-           return  (Integer.parseInt(ticketsInformation));
+            return (Integer.parseInt(ticketsInformation));
         }
-        //Вариант 1
-   /*     List<WebElement> elements = driver.findElements(By.cssSelector("div[class='service-block-1 service-doctor js-doctor']"));
-        for (WebElement webElement : elements) {
-            String ticketsInformation = webElement.findElement(
-                    By.cssSelector("ul[class='service-doctor-top__col service-doctor-top__list']")).getText();
-            if (ticketsInformation.trim().equals("")) {
-                ticketNumber = 0;
-            } else {
-                ticketsInformation = ticketsInformation.replaceAll("[\\D]", "");
-                ticketNumber = (Integer.parseInt(ticketsInformation));
-            }
-        }*/
     }
 
 
     private void getFinishedTaskInformation(int ticketNumber) {
         if (ticketNumber > 0) {
-            System.out.printf("Количество номерков : %s\n", ticketNumber);
-            System.out.println("Завершение задачи - id - " + id + " результат - номерки найдены");
+            logger.info("Id " + id + ". Найдено " + ticketNumber + " номерков.");
             lookUpService.eliminateTask(id);
+            //Уведомить пользователя
         } else {
-            System.out.println("Номерков нет");
-            System.out.println("Завершение задачи - id - " + id + " результат - номерков нет");
-            lastAttempt.setTime(System.currentTimeMillis());
-            System.out.println(lastAttempt);
-
+            logger.info("Id " + id + ". Номерки не найдены");
+            lastAttempt = Instant.ofEpochMilli(System.currentTimeMillis());
+            attemptsNumber++;
+            lookUpService.updateTaskEntity(this);
+            checkAndHandleTimeout();
         }
-
-        //TODO реализовать остановку поиска по истечению некоторого времени
-     /*   if (System.currentTimeMillis() > addTime + 5000) {
-            System.out.println("Поптыки кончились. id - " + id);
-            System.out.println("id" + id + "попытки кончились");
-        }*/
     }
 
-
-
-
+    private void checkAndHandleTimeout() {
+        if (System.currentTimeMillis() > addTime + 500000) {
+            logger.info("Id " + id + ". Попытки кончились");
+            //Уведомить пользователя
+            lookUpService.eliminateTask(id);
+        }
+    }
 }
 
