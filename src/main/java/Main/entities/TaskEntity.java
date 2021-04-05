@@ -1,7 +1,9 @@
 package Main.entities;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -13,23 +15,28 @@ import java.time.Instant;
 @Setter
 @NoArgsConstructor
 @Entity
+@FieldDefaults(level= AccessLevel.PRIVATE)
 public class TaskEntity {
 
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    private int id;
+    int id;
 
-    private String url;
-    private String doctorOrCabinetName;
-    private long addTime;
-    private Instant lastAttempt;
-    private boolean doctorChecked;
-    private int attemptsNumber;
+    String url;
+    String doctorOrCabinetName;
+    Instant addTime;
+    Instant lastAttempt;
+    boolean doctorChecked;
+    int attemptsNumber;
+    long userId;
+    long chatId;
 
-    public TaskEntity(String url, String doctorOrCabinetName) {
+    public TaskEntity(String url, String doctorOrCabinetName, long userId, long chatId) {
         this.url = url;
         this.doctorOrCabinetName = doctorOrCabinetName;
         this.attemptsNumber = 0;
+        this.chatId = chatId;
+        this.userId=userId;
     }
 }

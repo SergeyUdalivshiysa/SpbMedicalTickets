@@ -1,8 +1,10 @@
 package Main.services;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 import org.openqa.selenium.By;
 import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
@@ -14,9 +16,12 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
+
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Getter
@@ -24,20 +29,28 @@ import java.util.List;
 @NoArgsConstructor
 @Component
 @Scope("prototype")
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class LookUpTask implements Runnable {
 
     @Autowired
     private LookUpService lookUpService;
 
-    private String url;
-    private int id;
-    private String doctorOrCabinetName;
-    private long addTime;
-    private Instant lastAttempt;
-    private boolean doctorChecked;
-    private int attemptsNumber;
+    @Autowired
+    private UserNotificationService userNotificationService;
+
+    String url;
+    int id;
+    String doctorOrCabinetName;
+    Instant addTime;
+    Instant lastAttempt;
+    boolean doctorChecked;
+    int attemptsNumber;
     int ticketNumber;
+    long chatId;
     Logger logger = LoggerFactory.getLogger(LookUpTask.class);
+
+    @Value("${lookUpTaskSearchPeriod}")
+    int lookUpTaskSearchPeriod;
 
     public void run() {
         logger.info("Начало работы id - " + id);
@@ -81,9 +94,8 @@ public class LookUpTask implements Runnable {
                 doctorChecked = true;
                 ticketNumber = getNumberOfTickets(webElement, driver);
                 getFinishedTaskInformation(ticketNumber);
-            } else handleDoctorAbsence();
-        }
-        catch (TimeoutException exception) {
+            } else handleDoctorAbsence(driver);
+        } catch (TimeoutException exception) {
             logger.info("Id + " + id + ". Timeout Exception.");
             handleTimeoutException(driver);
         }
@@ -103,20 +115,20 @@ public class LookUpTask implements Runnable {
         driver.quit();
         if (!doctorChecked && attemptsNumber >= 3) {
             logger.info("Id - " + id + ". Троекратная ошибка подключения к серверу.");
-            //Уведомить пользователя
+            sendMessage("Троекратная ошибка подключения к серверу, проверьте имя доктора/кабинета/процедуры и корректность ссылки");
             lookUpService.eliminateTask(id);
-        }
-        else {
+        } else {
             attemptsNumber++;
             lastAttempt = Instant.ofEpochMilli(System.currentTimeMillis());
             lookUpService.updateTaskEntity(this);
         }
     }
 
-    private void handleDoctorAbsence() {
+    private void handleDoctorAbsence(WebDriver driver) {
         logger.info("Id " + id + ". Доктор не найден.");
-        //Уведомить пользователя
+        sendMessage("Доктор/кабинет/процедура не найден, проверьте корректность.");
         lookUpService.eliminateTask(id);
+        driver.close();
     }
 
     private int getNumberOfTickets(WebElement webElement, WebDriver driver) {
@@ -137,7 +149,7 @@ public class LookUpTask implements Runnable {
         if (ticketNumber > 0) {
             logger.info("Id " + id + ". Найдено " + ticketNumber + " номерков.");
             lookUpService.eliminateTask(id);
-            //Уведомить пользователя
+            sendMessage(String.format("По ссылке %s найдено %s номерков!", url, ticketNumber));
         } else {
             logger.info("Id " + id + ". Номерки не найдены");
             lastAttempt = Instant.ofEpochMilli(System.currentTimeMillis());
@@ -148,11 +160,15 @@ public class LookUpTask implements Runnable {
     }
 
     private void checkAndHandleTimeout() {
-        if (System.currentTimeMillis() > addTime + 500000) {
+        if (Instant.now().compareTo(addTime.plus(5, ChronoUnit.MINUTES)) > 0) {
             logger.info("Id " + id + ". Попытки кончились");
-            //Уведомить пользователя
+            sendMessage("За прошедшую неделю номерки не были найдены. Создайте новый поиск для повтора");
             lookUpService.eliminateTask(id);
         }
+    }
+
+    private void sendMessage(String message) {
+        userNotificationService.sendMessageToUser(message, chatId);
     }
 }
 

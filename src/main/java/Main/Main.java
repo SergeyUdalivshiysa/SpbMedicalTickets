@@ -5,8 +5,10 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@EnableScheduling
 public class Main {
     static Logger loggerSearch;
     static Logger loggerExceptions;
@@ -18,7 +20,7 @@ public class Main {
         SpringApplication.run(Main.class, args);
         System.setProperty("webdriver.chrome.driver", "lib\\operadriver.exe");
 
-        //TODO Добавить логгирование, добавить тесты
+        //TODO Добавить логгирование, тесты
 
 
 
