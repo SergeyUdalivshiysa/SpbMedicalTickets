@@ -12,7 +12,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 public class ThreadPoolTaskSchedulerConfig {
 
     @Value("${threadPoolSize}")
-    int threadPoolSize;
+    private int threadPoolSize;
 
     @Bean
     public ThreadPoolTaskScheduler taskExecutor () {

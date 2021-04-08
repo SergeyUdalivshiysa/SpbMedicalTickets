@@ -10,4 +10,5 @@ public class LookUpTaskDTO {
     String doctorOrCabinetName;
     long userId;
     long chatId;
+    int ticketMinimumValueNeeded;
 }

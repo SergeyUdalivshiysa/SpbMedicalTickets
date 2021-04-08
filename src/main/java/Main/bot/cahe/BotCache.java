@@ -32,6 +32,7 @@ public class BotCache {
 
 
 
+
     @Scheduled(fixedRate = 1000 * 60 * 30)
     static public void cleanCache() {
         userStatusCache.forEach((aLong, userStatus) -> {

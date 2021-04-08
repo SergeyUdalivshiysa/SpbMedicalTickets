@@ -19,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -47,6 +46,7 @@ public class LookUpTask implements Runnable {
     int attemptsNumber;
     int ticketNumber;
     long chatId;
+    int ticketMinimumValueNeeded;
     Logger logger = LoggerFactory.getLogger(LookUpTask.class);
 
     @Value("${lookUpTaskSearchPeriod}")
@@ -83,17 +83,14 @@ public class LookUpTask implements Runnable {
                 "--no-sandbox",
                 "--disable-dev-shm-usage"
         );*/
-        WebDriver driver = new ChromeDriver(options);
-        return driver;
+        return new ChromeDriver(options);
     }
 
     private void getAndHandleWebElement(WebDriver driver, String url, String doctorOrCabinetName) {
         try {
-            WebElement webElement = getWebElement(driver, url, doctorOrCabinetName);
+            WebElement webElement = getWebElementAndFindDoctor(driver, url, doctorOrCabinetName);
             if (webElement != null) {
-                doctorChecked = true;
-                ticketNumber = getNumberOfTickets(webElement, driver);
-                getFinishedTaskInformation(ticketNumber);
+                handleDoctorFinding(driver, webElement);
             } else handleDoctorAbsence(driver);
         } catch (TimeoutException exception) {
             logger.info("Id + " + id + ". Timeout Exception.");
@@ -101,7 +98,7 @@ public class LookUpTask implements Runnable {
         }
     }
 
-    private WebElement getWebElement(WebDriver driver, String url, String doctorOrCabinetName) throws TimeoutException {
+    private WebElement getWebElementAndFindDoctor(WebDriver driver, String url, String doctorOrCabinetName) throws TimeoutException {
         driver.get(url);
         WebDriverWait wait = new WebDriverWait(driver, 30);
         WebElement visibleElement = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("ul[class='service-doctor-top__col service-doctor-top__list']")));
@@ -119,16 +116,36 @@ public class LookUpTask implements Runnable {
             lookUpService.eliminateTask(id);
         } else {
             attemptsNumber++;
-            lastAttempt = Instant.ofEpochMilli(System.currentTimeMillis());
+            lastAttempt = Instant.now();
             lookUpService.updateTaskEntity(this);
         }
     }
 
+    private void handleDoctorFinding(WebDriver driver, WebElement webElement) {
+        doctorChecked = true;
+        ticketNumber = getNumberOfTickets(webElement, driver);
+        getFinishedTaskInformation(ticketNumber);
+    }
+
     private void handleDoctorAbsence(WebDriver driver) {
-        logger.info("Id " + id + ". Доктор не найден.");
-        sendMessage("Доктор/кабинет/процедура не найден, проверьте корректность.");
-        lookUpService.eliminateTask(id);
-        driver.close();
+        List<WebElement> elements = driver.findElements(By.cssSelector("div[data-doctor-name]"));
+        WebElement webElement = null;
+        for (WebElement element : elements) {
+            String doctorName = element.findElement(
+                    By.className("service-block-1__title"))
+                    .getText();
+            if (doctorName.trim().equals(doctorOrCabinetName)) {
+                webElement = element;
+                break;
+            }
+        }
+        if (webElement == null) {
+            logger.info("Id " + id + ". Доктор не найден.");
+            sendMessage("Доктор/кабинет/процедура не найден, проверьте корректность.");
+            lookUpService.eliminateTask(id);
+            driver.close();
+        }
+        else handleDoctorFinding(driver, webElement);
     }
 
     private int getNumberOfTickets(WebElement webElement, WebDriver driver) {
@@ -146,13 +163,13 @@ public class LookUpTask implements Runnable {
 
 
     private void getFinishedTaskInformation(int ticketNumber) {
-        if (ticketNumber > 0) {
+        if (ticketNumber >= ticketMinimumValueNeeded) {
             logger.info("Id " + id + ". Найдено " + ticketNumber + " номерков.");
             lookUpService.eliminateTask(id);
             sendMessage(String.format("По ссылке %s найдено %s номерков!", url, ticketNumber));
         } else {
             logger.info("Id " + id + ". Номерки не найдены");
-            lastAttempt = Instant.ofEpochMilli(System.currentTimeMillis());
+            lastAttempt = Instant.now();
             attemptsNumber++;
             lookUpService.updateTaskEntity(this);
             checkAndHandleTimeout();

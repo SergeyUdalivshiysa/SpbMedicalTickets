@@ -1,5 +1,6 @@
 package Main.bot;
 
+import Main.entities.TaskEntity;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -8,6 +9,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
 
 @Component
 @Scope("prototype")
@@ -16,18 +18,19 @@ import java.time.Instant;
 @FieldDefaults(level= AccessLevel.PRIVATE)
 public class UserStatus {
 
-    BotStatus botStatus;
+    BotState botState;
     Instant lastInteractionTime;
     String url;
     String name;
+    ArrayList<TaskEntity> taskEntities = null;
 
     public UserStatus() {
-        botStatus = BotStatus.INITIALIZED;
+        botState = BotState.MENU;
         lastInteractionTime = Instant.now();
     }
 
-    public UserStatus(BotStatus botStatus) {
-        this.botStatus = botStatus;
+    public UserStatus(BotState botStatus) {
+        this.botState = botStatus;
         lastInteractionTime = Instant.now();
     }
 

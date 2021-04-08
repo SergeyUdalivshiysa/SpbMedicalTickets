@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ScheduledFuture;
 
 
@@ -37,18 +38,13 @@ public class LookUpService {
     @Value("${lookUpRateMinutes}")
     private int lookUpRateMinutes;
 
-    //TODO: имплементировать влидацию
-    public boolean isUrlCorrect(String url) {
-        return url.matches("^(https://gorzdrav.spb.ru/service-free-schedule#).+");
-    }
-
     public void crateScheduledLookUpTask(LookUpTaskDTO lookUpTaskDTO) {
         String url = lookUpTaskDTO.getUrl();
         String name = lookUpTaskDTO.getDoctorOrCabinetName();
         long userId = lookUpTaskDTO.getUserId();
         long chatId = lookUpTaskDTO.getChatId();
-
-        TaskEntity taskEntity = new TaskEntity(url, name, userId, chatId);
+        int minimumTicketNumberNeeded = lookUpTaskDTO.getTicketMinimumValueNeeded();
+        TaskEntity taskEntity = new TaskEntity(url, name, userId, chatId, minimumTicketNumberNeeded);
         taskEntity.setAddTime(Instant.now());
         TaskEntity newTaskEntity = ticketEntityRepository.save(taskEntity);
         int entityId = newTaskEntity.getId();
@@ -64,7 +60,7 @@ public class LookUpService {
     }
 
 
-    public ScheduledFuture addTaskToExecutor(TaskEntity taskEntity) {
+    private ScheduledFuture addTaskToExecutor(TaskEntity taskEntity) {
         LookUpTask lookUpTask = applicationContext.getBean(LookUpTask.class);
         setLookUpTaskPropertiesFromTaskEntity(taskEntity, lookUpTask);
         ScheduledFuture scheduledFuture = taskScheduler.scheduleWithFixedDelay(lookUpTask, Duration.ofMinutes(lookUpRateMinutes));
@@ -72,6 +68,15 @@ public class LookUpService {
         return scheduledFuture;
     }
 
+    public void addTaskToExecutorFromDataBase(TaskEntity taskEntity) {
+        LookUpTask lookUpTask = applicationContext.getBean(LookUpTask.class);
+        setLookUpTaskPropertiesFromTaskEntity(taskEntity, lookUpTask);
+        Instant lastAttempt = taskEntity.getLastAttempt();
+        Instant startTime = lastAttempt.plus(lookUpRateMinutes, ChronoUnit.MINUTES);
+        ScheduledFuture scheduledFuture = taskScheduler.scheduleWithFixedDelay(lookUpTask, startTime, Duration.ofMinutes(lookUpRateMinutes));
+        logger.info("Id " + taskEntity.getId() + "is added to executor");
+        FutureStorage.putToStorage(taskEntity.getId(), scheduledFuture);
+    }
 
     public void updateTaskEntity(LookUpTask lookUpTask) {
         TaskEntity taskEntity = ticketEntityRepository.findById(lookUpTask.getId()).get();
@@ -85,6 +90,7 @@ public class LookUpService {
         lookUpTask.setUrl(taskEntity.getUrl());
         lookUpTask.setAddTime(taskEntity.getAddTime());
         lookUpTask.setChatId(taskEntity.getChatId());
+        lookUpTask.setTicketMinimumValueNeeded(taskEntity.getTicketMinimumValueNeeded());
     }
 
     private void setTaskEntityPropertiesFromLookUpTask(LookUpTask lookUpTask, TaskEntity taskEntity) {
@@ -92,6 +98,7 @@ public class LookUpService {
         taskEntity.setDoctorChecked(lookUpTask.isDoctorChecked());
         taskEntity.setLastAttempt(lookUpTask.getLastAttempt());
         taskEntity.setChatId(lookUpTask.getChatId());
+        taskEntity.setTicketMinimumValueNeeded(lookUpTask.getTicketMinimumValueNeeded());
     }
 
 }

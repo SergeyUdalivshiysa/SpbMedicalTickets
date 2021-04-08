@@ -31,12 +31,14 @@ public class TaskEntity {
     int attemptsNumber;
     long userId;
     long chatId;
+    int ticketMinimumValueNeeded;
 
-    public TaskEntity(String url, String doctorOrCabinetName, long userId, long chatId) {
+    public TaskEntity(String url, String doctorOrCabinetName, long userId, long chatId, int ticketMinimumValueNeeded) {
         this.url = url;
         this.doctorOrCabinetName = doctorOrCabinetName;
         this.attemptsNumber = 0;
         this.chatId = chatId;
         this.userId=userId;
+        this.ticketMinimumValueNeeded = ticketMinimumValueNeeded;
     }
 }
