@@ -1,0 +1,14 @@
+package main.bot;
+
+public enum BotState {
+    NO_STATE,
+    MENU,
+    NEW_SEARCH,
+    TOO_MUCH_REQUESTS_FOR_USER,
+    INSERT_LINK,
+    INSERT_DOCTOR_NAME,
+    INSERT_MINIMUM_TICKET_NUMBER_NEEDED,
+    QUERY_CREATED,
+    MY_REQUESTS,
+    DELETE
+}
